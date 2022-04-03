@@ -1,0 +1,26 @@
+<annotation>
+	<folder>images_mask</folder>
+	<filename>maksssksksss56.jpg</filename>
+	<path>/home/achrafnvl/Escritorio/PersonDetect/images_mask/maksssksksss56.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>400</width>
+		<height>267</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>mask</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>187</xmin>
+			<ymin>81</ymin>
+			<xmax>275</xmax>
+			<ymax>181</ymax>
+		</bndbox>
+	</object>
+</annotation>
