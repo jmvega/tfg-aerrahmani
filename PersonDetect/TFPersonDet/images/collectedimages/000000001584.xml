@@ -1,0 +1,26 @@
+<annotation>
+	<folder>collectedimages</folder>
+	<filename>000000001584.jpg</filename>
+	<path>/home/achrafnvl/Escritorio/PersonDetect/images/collectedimages/000000001584.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>612</width>
+		<height>612</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>no_mask</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>293</xmin>
+			<ymin>158</ymin>
+			<xmax>323</xmax>
+			<ymax>184</ymax>
+		</bndbox>
+	</object>
+</annotation>
