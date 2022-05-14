@@ -63,6 +63,17 @@ def hashpass(passw):
   return hashB
 
 
+@app.route("/choose_option/", methods=["GET","POST"])
+def get_option():
+    if request.method == 'POST':
+        if request.form.get("video"):
+            return redirect(url_for("video"))
+        else:
+            return redirect(url_for("gallery"))
+    else: 
+        return redirect(url_for("login_2fa"))
+
+
 def generate_frames():
     threads=4
 
@@ -85,6 +96,7 @@ def generate_frames():
     NUM_DATA=2
     measures = np.zeros([1,NUM_DATA])
     first_time=True
+    count=0
     while cap.isOpened():
         success, image = cap.read()
         if not success:
@@ -114,16 +126,20 @@ def generate_frames():
                             _MARGIN + _ROW_SIZE + detection.bounding_box.top)
             cv2.putText(image, result_text, text_location, cv2.FONT_HERSHEY_PLAIN,
                         _FONT_SIZE, _TEXT_COLOR, _FONT_THICKNESS)
-        # if counter % fps_avg_frame_count == 0:
-        #     end_time = time.time()
-        #     fps = fps_avg_frame_count / (end_time - start_time)
-        #     start_time = time.time()
 
-        # fps_text = 'FPS = {:.1f}'.format(fps)
+            if class_name=="no_mask":
+              count+=1
+              cv2.imwrite("images/frame%d.jpg"%count,image)
+        if counter % fps_avg_frame_count == 0:
+            end_time = time.time()
+            fps = fps_avg_frame_count / (end_time - start_time)
+            start_time = time.time()
 
-        # text_location = (left_margin, row_size)
-        # cv2.putText(image, fps_text, text_location, cv2.FONT_HERSHEY_PLAIN,
-        #             font_size, text_color, font_thickness)
+        fps_text = 'FPS = {:.1f}'.format(fps)
+
+        text_location = (left_margin, row_size)
+        cv2.putText(image, fps_text, text_location, cv2.FONT_HERSHEY_PLAIN,
+                    font_size, text_color, font_thickness)
         ret,buffer=cv2.imencode('.jpg',image)
         image=buffer.tobytes()
 
@@ -133,31 +149,31 @@ def generate_frames():
 
 
 @app.route("/login/2fa/")
-@fresh_login_required
+# @fresh_login_required
 def login_2fa():
     secret = pyotp.random_base32()
     server=smtplib.SMTP("smtp.gmail.com",587)
     server.starttls()
-    server.login("sendmessagefromflaak@gmail.com","123456fl*")
-    server.sendmail("sendmessagefromflaak@gmail.com","arraklk924@gmail.com",secret)
+    server.login("correo@gmail.com","contraseña en claro")
+    server.sendmail("correo@gmail.com","correodestinatario@gmail.com",secret)
     return render_template("login_2fa.html", secret=secret)
 
 
 
 @app.route("/login/2fa/", methods=["POST"])
-@fresh_login_required
+# @fresh_login_required
 def login_2fa_form():
   
-    secret = request.form.get("secret")
-    otp = int(request.form.get("otp"))
-
+    # secret = request.form.get("secret")
+    # otp = int(request.form.get("otp"))
+    return render_template("choose_option.html")
     
-    if pyotp.TOTP(secret).verify(otp):
-        flash("The TOTP 2FA token is valid", "success")
-        return redirect(url_for("video"))
-    else:
-        flash("You have supplied an invalid 2FA token!", "danger")
-        return redirect(url_for("login_2fa"))
+    # if pyotp.TOTP(secret).verify(otp):
+    #     flash("The TOTP 2FA token is valid", "success")
+    #     return redirect(url_for("video"))
+    # else:
+    #     flash("You have supplied an invalid 2FA token!", "danger")
+    #     return redirect(url_for("login_2fa"))
 
 
 @login_manager.user_loader
@@ -184,10 +200,29 @@ def login():
     flash("Invalid credentials. Please try again.")
   return redirect(url_for("index"))
 
+@app.route("/upload", methods=["POST"])
+def upload():
+    target = os.path.join('images/')
+    if not os.path.isdir(target):
+            os.mkdir(target)
+    for upload in request.files.getlist("file"):
+        filename = upload.filename
+        destination = "/".join([target, filename])
+        upload.save(destination)
 
+
+@app.route('/upload/<filename>')
+def send_image(filename):
+    return send_from_directory("images", filename)
+
+@app.route("/gallery")
+# @fresh_login_required
+def gallery():
+  image_names = os.listdir("images")
+  return render_template("gallery.html",image_names=image_names)
 
 @app.route("/video")
-@fresh_login_required
+# @fresh_login_required
 def video():
   return Response(generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
 
