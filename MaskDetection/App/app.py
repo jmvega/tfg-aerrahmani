@@ -16,6 +16,10 @@ import cv2
 from maskdetector import MaskDetector
 import numpy as np
 import sqlite3 as sq
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from cryptography.fernet import Fernet
+import base64
 
 
 
@@ -158,10 +162,27 @@ def generate_frames():
 @fresh_login_required
 def login_2fa():
     secret = pyotp.random_base32()
-    server=smtplib.SMTP("smtp.gmail.com",587)
+    sender_email_address = 'sendsecretflask@outlook.com'
+    sender_email_password = "123456Sec10*"
+    receiver_email_address = mail_to
+
+    email_subject_line = 'Sample Python Email'
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email_address
+    msg['To'] = receiver_email_address
+    msg['Subject'] = email_subject_line
+
+    email_body = 'Hello World. This is the secret: %s.'%secret
+    msg.attach(MIMEText(email_body, 'plain'))
+
+    email_content = msg.as_string()
+    server = smtplib.SMTP('smtp-mail.outlook.com:587')
     server.starttls()
-    server.login("sendmessagefromflaak@gmail.com","123456fl*")
-    server.sendmail("sendmessagefromflaak@gmail.com","arraklk924@gmail.com",secret)
+    server.login(sender_email_address, sender_email_password)
+
+    server.sendmail(sender_email_address, receiver_email_address, email_content)
+    server.quit()
     return render_template("login_2fa.html", secret=secret)
 
 
