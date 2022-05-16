@@ -163,7 +163,7 @@ def generate_frames():
 def login_2fa():
     secret = pyotp.random_base32()
     sender_email_address = 'sendsecretflask@outlook.com'
-    sender_email_password = "123456Sec10*"
+    sender_email_password = "contraseña en claro"
     receiver_email_address = mail_to
 
     email_subject_line = 'Sample Python Email'

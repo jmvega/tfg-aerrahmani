@@ -32,7 +32,7 @@ def connect():
 def enter(site, user, pas):
     conn = sq.connect(db)
     c = conn.cursor()
-    c.execute("INSERT INTO data VALUES(?,?,?)", (email, user, pas))
+    c.execute("INSERT INTO data VALUES(?,?,?)", (site, user, pas))
     conn.commit()
     conn.close()
  
