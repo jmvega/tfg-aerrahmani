@@ -39,8 +39,10 @@ class MaskDetector:
     model_metadata = json.loads(displayer.get_metadata_json())
     process_units = model_metadata['subgraph_metadata'][0][
         'input_tensor_metadata'][0]['process_units']
+
     mean = 127.5
     std = 127.5
+
     for option in process_units:
       if option['options_type'] == 'NormalizationOptions':
         mean = option['options']['mean'][0]
@@ -60,6 +62,7 @@ class MaskDetector:
 
     sorted_output_indices = sorted(
         [output['index'] for output in interpreter.get_output_details()])
+    
     self._output_indices = {
         self._OUTPUT_LOCATION_NAME: sorted_output_indices[0],
         self._OUTPUT_CATEGORY_NAME: sorted_output_indices[1],
@@ -88,38 +91,51 @@ class MaskDetector:
 
     return self.postprocess(data)
 
+
+
   def preprocess(self, input_image):
     input_tensor = cv2.resize(input_image, self._input_size)
     input_tensor = np.expand_dims(input_tensor, axis=0)
     return input_tensor
+
+
 
   def set_input_tensor(self, image):
     tensor_index = self._interpreter.get_input_details()[0]['index']
     input_tensor = self._interpreter.tensor(tensor_index)()[0]
     input_tensor[:, :] = image
 
+
+
   def get_output_tensor(self, name):
     output_index = self._output_indices[name]
     tensor = np.squeeze(self._interpreter.get_tensor(output_index))
     return tensor
 
+
+
   def postprocess(self, data):
     boxes,classes,scores,count,image_width,image_height=data
     results = []
-    threshold=0.2
+    threshold=0.4
+
     for i in range(count):
       if scores[i] >= threshold:
+
         y_min, x_min, y_max, x_max = boxes[i]
+
         bounding_box = Box(
             top=int(y_min * image_height),
             left=int(x_min * image_width),
             bottom=int(y_max * image_height),
             right=int(x_max * image_width))
         class_id = int(classes[i])
+
         category = Info(
             score=scores[i],
             label=self._label_list[class_id],
             index=class_id)
+        
         result = Detection(bounding_box=bounding_box, categories=[category])
         results.append(result)
 

@@ -20,6 +20,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from cryptography.fernet import Fernet
 import base64
+from wtforms import SelectField
+from flask_wtf import FlaskForm
 
 
 
@@ -29,6 +31,7 @@ cap.set(3, 320)
 cap.set(4, 240)
 db = 'secure.db'
 mail_to=""
+messagetimeout=30
 
 _MARGIN = 10
 _ROW_SIZE = 10
@@ -57,31 +60,49 @@ class User(UserMixin):
         self.id = id
         self.name = name
         self.password = password
-        # self.email = email
+
+
+
+class Form(FlaskForm):
+    seconds=SelectField('minutes', choices=[('Hard','0 minutes'),('Soft','1 minute')])
+
+
 
 users=[]
 
 @app.route("/")
 def index():
-  return render_template('index.html')
+    return render_template('index.html')
 
 
 def hashpass(passw):
-  password=str.encode(passw)
-  hashB=hashlib.sha256(password).hexdigest()
-  
-  return hashB
+    password=str.encode(passw)
+    hashB=hashlib.sha256(password).hexdigest()
+    
+    return hashB
 
 
-@app.route("/choose_option/", methods=["GET","POST"])
+@app.route("/choose_option", methods=["POST"])
+@fresh_login_required
 def get_option():
     if request.method == 'POST':
         if request.form.get("video"):
-            return redirect(url_for("video"))
+            return render_template('showvideo.html')
         else:
             return redirect(url_for("gallery"))
     else: 
         return redirect(url_for("login_2fa"))
+
+
+@app.route("/choose_delay", methods=["POST"])
+@fresh_login_required
+def choose_delay_email():
+    global messagetimeout
+    if request.form.get('seconds') == 'Soft(1 minute)':
+        messagetimeout=60
+    elif request.form.get('seconds') == 'Soft(2 minutes)':
+        messagetimeout=120
+    return render_template("choose_option.html")
 
 
 def generate_frames():
@@ -107,6 +128,10 @@ def generate_frames():
     measures = np.zeros([1,NUM_DATA])
     first_time=True
     count=0
+    first_detection=True
+    subject='WARNING!! PERSON WITHOUT MASK DETECTED'
+
+
     while cap.isOpened():
         success, image = cap.read()
         if not success:
@@ -138,8 +163,12 @@ def generate_frames():
                         _FONT_SIZE, _TEXT_COLOR, _FONT_THICKNESS)
 
             if class_name=="no_mask":
-              count+=1
-              cv2.imwrite("images/frame%d.jpg"%count,image)
+                count+=1
+                cv2.imwrite("images/frame%d.jpg"%count,image)
+                if abs(init_time-time.time()) > messagetimeout or first_detection:
+                    first_detection=False
+                    init_time=time.time()
+                    send_email(subject,"Person without mask detected. If you have missed it you can check it in server gallery. Frame%d.jpg"%count)
         # if counter % fps_avg_frame_count == 0:
         #     end_time = time.time()
         #     fps = fps_avg_frame_count / (end_time - start_time)
@@ -158,22 +187,19 @@ def generate_frames():
 
 
 
-@app.route("/login/2fa/")
-@fresh_login_required
-def login_2fa():
-    secret = pyotp.random_base32()
+def send_email(subject,content):
     sender_email_address = 'sendsecretflask@outlook.com'
     sender_email_password = "contraseña en claro"
     receiver_email_address = mail_to
 
-    email_subject_line = 'Secreto'
+    email_subject_line = subject
 
     msg = MIMEMultipart()
     msg['From'] = sender_email_address
     msg['To'] = receiver_email_address
     msg['Subject'] = email_subject_line
 
-    email_body = 'This is the secret: %s.'%secret
+    email_body = content
     msg.attach(MIMEText(email_body, 'plain'))
 
     email_content = msg.as_string()
@@ -183,21 +209,31 @@ def login_2fa():
 
     server.sendmail(sender_email_address, receiver_email_address, email_content)
     server.quit()
+
+
+@app.route("/login/2fa/")
+@fresh_login_required
+def login_2fa():
+    secret = pyotp.random_base32()
+    subject="Secret code"
+    send_email(subject,"This is the secret code "+secret)
     return render_template("login_2fa.html", secret=secret)
 
 
 
 @app.route("/login/2fa/", methods=["POST"])
-@fresh_login_required
+# @fresh_login_required
 def login_2fa_form():
   
     secret = request.form.get("secret")
     otp = int(request.form.get("otp"))
-    return render_template("choose_option.html")
     
     if pyotp.TOTP(secret).verify(otp):
         flash("The TOTP 2FA token is valid", "success")
-        return redirect(url_for("video"))
+        form=Form()
+        form.seconds.choices=['Default(30 seconds)','1 minute','2 minutes']
+        
+        return render_template('timeelection.html',form=form)
     else:
         flash("You have supplied an invalid 2FA token!", "danger")
         return redirect(url_for("login_2fa"))
@@ -214,35 +250,38 @@ def search_user_data(name):
     if len(data) == 0:
         return None
 
+
 @login_manager.user_loader
 def load_user(n):
-  global users
-  form_user = request.form.get("username")
+    global users
+    form_user = request.form.get("username")
 
-  form_pass = request.form.get("password")
-  user=User(1,form_user,form_pass)
-  users.append(user)
-  return user
+    form_pass = request.form.get("password")
+    user=User(1,form_user,form_pass)
+    users.append(user)
+    return user
 
-@app.route("/login", methods=['GET', 'POST'])
+
+@app.route("/login", methods=['POST'])
 def login():
-  global mail_to
-  if request.method == 'POST':
-      user=load_user(1)
-      data=search_user_data(user.name)
-      if data != None:
-        if user.name == data[0][1] and str(hashpass(user.password)) == data[0][2]:
-          mail_to=data[0][0]
-          login_user(user,remember=False)
-          return redirect(url_for("login_2fa"))
-  flash("Invalid credentials. Please try again.")
-  return redirect(url_for("index"))
+    global mail_to
+    if request.method == 'POST':
+        user=load_user(1)
+        data=search_user_data(user.name)
+        if data != None:
+            if user.name == data[0][1] and str(hashpass(user.password)) == data[0][2]:
+                mail_to=data[0][0]
+                login_user(user,remember=False)
+                return redirect(url_for("login_2fa"))
+    flash("Invalid credentials. Please try again.")
+    return redirect(url_for("index"))
+
 
 @app.route("/upload", methods=["POST"])
 def upload():
     target = os.path.join('images/')
     if not os.path.isdir(target):
-            os.mkdir(target)
+        os.mkdir(target)
     for upload in request.files.getlist("file"):
         filename = upload.filename
         destination = "/".join([target, filename])
@@ -253,19 +292,21 @@ def upload():
 def send_image(filename):
     return send_from_directory("images", filename)
 
+
 @app.route("/gallery")
 @fresh_login_required
 def gallery():
-  image_names = os.listdir("images")
-  return render_template("gallery.html",image_names=image_names)
+    image_names = os.listdir("images")
+    return render_template("gallery.html",image_names=image_names)
+
 
 @app.route("/video")
 @fresh_login_required
 def video():
-  return Response(generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 if __name__ == "__main__":
   
-  app.config["SECRET_KEY"] = os.urandom(16).hex()
-  app.run(debug=False,host="0.0.0.0")
+    app.config["SECRET_KEY"] = os.urandom(16).hex()
+    app.run(debug=False,host="127.0.0.1")
